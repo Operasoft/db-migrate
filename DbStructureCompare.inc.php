@@ -134,7 +134,7 @@ class DbStructureCompare {
 				if ($field->key != $field2->key) {
 					$msg[] = "ERROR: Field $name has a different key value: $db1_name.". $field->key . " : $db2_name.". $field2->key;
 					if ($field->key) {
-						$scripts[] = $this->addKeyScript($table1->name, $field, $db2Script);
+						$scripts[] = $this->addKeyScript($table1->name, $field);
 					}
 				}
 				if ($field->default != $field2->default) {
