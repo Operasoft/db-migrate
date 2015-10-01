@@ -103,7 +103,11 @@ class DbContentCompare {
 			if ($this->isQuoteRequired($table, $name)) {
 				$script .= "'".str_replace("'", "''", $value)."'";
 			} else {
-				$script .= "$value";
+				if (empty($value)) {
+					$script .= "NULL";
+				} else {
+					$script .= "$value";					
+				}
 			}
 		}				
 		$script .= ")";
