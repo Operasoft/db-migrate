@@ -180,11 +180,11 @@ class DbStructureCompare {
 		
 		$key = "";
 		if ($field->key == "PRI") {
-			$key = ", PRIMARY KEY (`{$field->name}`)";	
+			$key = ", ADD PRIMARY KEY (`{$field->name}`)";	
 		} else if ($field->key == 'MUL') {
-			$key = ", KEY `{$field->name}` (`{$field->name}`)";
+			$key = ", ADD KEY `{$field->name}` (`{$field->name}`)";
 		} else if ($field->key == 'UNI') {
-			$key = ", UNIQUE (`{$field->name}`)";	
+			$key = ", ADD UNIQUE (`{$field->name}`)";	
 		}
 		
 		if (empty($after)) {
