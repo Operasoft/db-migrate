@@ -151,6 +151,7 @@ class DbStructureComparator {
 		foreach ($table2->fields as $name => $field) {
 			if (!isset($table1->fields[$name])) {
 				$msg[] = "Field $name not found in ". $db1_name;
+                $scripts[] = $this->addRemoveFieldScript($table1->name, $field);
 			}
 		}	
 		
@@ -237,6 +238,19 @@ class DbStructureComparator {
 		
 		return $script;
 	}
+
+    /**
+     * Creates the SQL script to add a new field to an existing table
+     */
+    private function addRemoveFieldScript($table, $field) {
+        $script = "";
+        $SQL = "ALTER TABLE `$table` DROP COLUMN `{$field->name}`";
+
+        $script .= "-- DROP FIELD {$field->name} to table $table".PHP_EOL;
+        $script .= $SQL.PHP_EOL;
+
+        return $script;
+    }
 
 	/**
 	 * Creates the SQL script to add a new key to an existing table
