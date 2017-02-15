@@ -1,6 +1,6 @@
 <?php
 spl_autoload_register(function ($class_name) {
-    require 'src/'.$class_name . '.php';
+    require './src/'.str_replace("\\", "/",$class_name) . '.php';
 });
 
 use DbMigrate\Comparator\DbContentComparator;
