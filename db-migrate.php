@@ -1,123 +1,100 @@
 <?php
-require_once(__DIR__.'/DbStructure.inc.php');
-require_once(__DIR__.'/DbStructureCompare.inc.php');
-require_once(__DIR__.'/DbContentCompare.inc.php');
+spl_autoload_register(function ($class_name) {
+    require 'src/'.$class_name . '.php';
+});
 
-//-----------------------------------------------------------------------------
-// Make sure the config file defines the proper variables
-//-----------------------------------------------------------------------------
-function validateConfig($config) {
-	$result = true;
-	
-	if (empty($config['db_src'])) {
-		echo "ERROR: 'db_src' variable missing from config file".PHP_EOL;
-		$result = false;
-	}
-	
-	if (empty($config['db_target'])) {
-		echo "ERROR: 'db_target' variable missing from config file".PHP_EOL;
-		$result = false;
-	}
-
-	if (!isset($config['db_tables'])) {
-		echo "ERROR: 'db_tables' variable missing from config file".PHP_EOL;
-		$result = false;
-	}
-	
-	return $result;
-}
+use DbMigrate\Comparator\DbContentComparator;
+use DbMigrate\Comparator\DbStructureComparator;
+use DbMigrate\Config\ConfigurationManager;
+use DbMigrate\Model\DbStructure;
 
 //-----------------------------------------------------------------------------
 // MAIN LOOP
 //-----------------------------------------------------------------------------
+date_default_timezone_set('UTC');
+
 if (empty($argv[1])) {
 	die("ERROR: missing config file");
 }
 echo "Using config file: ".$argv[1].PHP_EOL;
-$config = include($argv[1]);
 
-if (!validateConfig($config)) {
-	die("ERROR: Invalid config file provided");
-}
-echo "Config file validated".PHP_EOL;
+$config = new ConfigurationManager();
+$config->load($argv[1]);
 
-$compareStructure = true;
-$compareContent = true;
+$source = $config->getSourceDb();
+$target = $config->getTargetDb();
 
-if (!empty($argv[2])) {
-	if ($argv[2] == "-contentOnly") {
-		$compareStructure = false;
-	} else if ($argv[2] == "-structureOnly") {
-		$compareContent = false;		
-	} else {
-		die("Unknown parameter: ".$argv[2]);
-	}
-}
+foreach ($config->getDbConfigs() as $dbConfig) {
+    //
+    // Step 1: Setup DB connections
+    echo 'Connecting to source DB '.$dbConfig->getSource().'...'.PHP_EOL;
+    $srcDb = $source->connect($dbConfig->getSource());
 
-// Setup the DB connections
-$srcDb = mysqli_init();
-$srcDb->real_connect($config['db_src']['host'], $config['db_src']['username'], $config['db_src']['password'], $config['db_src']['database']);
-if ($srcDb->connect_errno) {
-	die("Failed to connect to source database: (" . $srcDb->connect_errno . ") " . $srcDb->connect_error);
-}
-echo "Connected to source database ".$config['db_src']['host']." - ".$config['db_src']['database'].PHP_EOL;
+    echo 'Connecting to target DB '.$dbConfig->getTarget().'...'.PHP_EOL;
+    $targetDb = $target->connect($dbConfig->getTarget());
 
-$targetDb = mysqli_init();
-$targetDb->real_connect($config['db_target']['host'], $config['db_target']['username'], $config['db_target']['password'], $config['db_target']['database']);
-if ($targetDb->connect_errno) {
-	$srcDb->close();
-	die("Failed to connect to target database: (" . $targetDb->connect_errno . ") " . $targetDb->connect_error);
-}
-echo "Connected to target database ".$config['db_target']['host']." - ".$config['db_target']['database'].PHP_EOL;
+    $date = date('Y-m-d');
 
-$date = date('Y-m-d_His');
+    //
+    // Step 2: Load the source database structure
+    $srcDb_structure = new DbStructure($srcDb, $dbConfig->getSource(), $source->getUsername());
 
-// Load the source database structure
-$srcDb_structure = new DbStructure($srcDb, $config['db_src']['database'], $config['db_src']['username']);
+    if ($dbConfig->isStructure()) {
+        echo "Comparing DB structures...".PHP_EOL;
 
-if ($compareStructure) {
-	echo "Comparing DB structures...".PHP_EOL;
-	
-	// Load the target database structure
-	$targetDb_structure = new DbStructure($targetDb, $config['db_target']['database'], $config['db_target']['username']);
+        // Load the target database structure
+        $targetDb_structure = new DbStructure($targetDb, $dbConfig->getTarget(), $target->getUsername());
 
-	//-----------------------------------------------------------------------------
-	// Compare both DB structures and generate the migration script
-	//-----------------------------------------------------------------------------
-	$tool = new DbStructureCompare($srcDb_structure, $targetDb_structure);
-	$scripts = $tool->compareStructure();
-	
-	// Store the migration script to file
-	$script = implode(PHP_EOL, $scripts);
-	$name = "migrate-structure-".$config['db_src']['database']."-".$config['db_target']['database']."-".$date.".sql";
-	$fp = fopen(__DIR__."/$name", "w");
-	fwrite($fp, $script);
-	fclose($fp);
+        //-----------------------------------------------------------------------------
+        // Compare both DB structures and generate the migration script
+        //-----------------------------------------------------------------------------
+        $tool = new DbStructureComparator($srcDb_structure, $targetDb_structure);
+        $scripts = $tool->compareStructure();
 
-	echo "Structure migration script stored in file $name".PHP_EOL;	
-}
+        // Store the migration script to file
+        $name = $config->getOutput().'/'.$source->getName().'-'.$target->getName().'-'.$dbConfig->getSource().'_schema'."-".$date.".sql";
 
-if ($compareContent) {
-	//-----------------------------------------------------------------------------
-	// Compare table contents and generate the migration script
-	//-----------------------------------------------------------------------------
-	$tool = new DbContentCompare($srcDb_structure, $srcDb, $targetDb);
-	$scripts = array();
-	foreach ($config['db_tables'] as $name => $values) {
-		$scripts[] = $tool->compareTable($name, $values['mode'], $values['key']);	
-	}
-	
-	// Store the migration script to file
-	$script = implode(PHP_EOL, $scripts);
-	$name = "migrate-content-".$config['db_src']['database']."-".$config['db_target']['database']."-".$date.".sql";
-	$fp = fopen(__DIR__."/$name", "w");
-	fwrite($fp, $script);
-	fclose($fp);
+        $script = implode(PHP_EOL, $scripts);
+        if (!empty(trim($script))) {
+            file_put_contents($name, $script);
+            echo "Schema migration script stored in file $name".PHP_EOL;
+        } else {
+            echo "NO SCHEMA MIGRATION REQUIRED".PHP_EOL;
+            if (file_exists($name)) {
+                unlink($name);
+            }
+        }
+    }
 
-	echo "Content migration script stored in file $name".PHP_EOL;	
+    if (!empty($dbConfig->getContent())) {
+        //-----------------------------------------------------------------------------
+        // Compare table contents and generate the migration script
+        //-----------------------------------------------------------------------------
+        $tool = new DbContentComparator($srcDb_structure, $srcDb, $targetDb);
+        $scripts = array();
+        foreach ($dbConfig->getContent() as $content) {
+            $scripts[] = $tool->compareTable($content['table'], $content['mode'], $content['key']);
+        }
+
+        // Store the migration script to file
+        $name = $config->getOutput() . '/' . $source->getName() . '-' . $target->getName() . '-' . $dbConfig->getSource() . '_content' . "-" . $date . ".sql";
+
+        $script = implode(PHP_EOL, $scripts);
+        if (!empty(trim($script))) {
+            file_put_contents($name, $script);
+            echo "Content migration script stored in file $name" . PHP_EOL;
+        } else {
+            echo "NO CONTENT MIGRATION REQUIRED".PHP_EOL;
+            if (file_exists($name)) {
+                unlink($name);
+            }
+        }
+
+    }
+
+    // Release the DB connections
+    $srcDb->close();
+    $targetDb->close();
 }
 
-// Release the DB connections
-$srcDb->close();
-$targetDb->close();
 echo "DONE".PHP_EOL;

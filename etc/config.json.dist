@@ -1,0 +1,51 @@
+{
+  "source": {
+    "name": "name of the server where the source databases are located",
+    "host": "localhost:3306",
+    "username": "mysql_username",
+    "password": "mysql_password"
+  },
+  "target": {
+    "name": "name of the server where the target databases are located",
+    "host": "target:3306",
+    "username": "mysql_username",
+    "password": "@mysql_password"
+  },
+  "output": "./out",
+  "databases": [
+    {
+      "source": "source_db1_name",
+      "target": "target_db1_name",
+      "structure": true,
+      "content": [
+        {
+          "table": "table1",
+          "mode": "update",
+          "key": "id"
+        },
+        {
+          "table": "table2",
+          "mode": "newOnly",
+          "key": "id"
+        }
+      ]
+    },
+    {
+      "source": "source_db2_name",
+      "target": "target_db2_name",
+      "structure": false,
+      "content": [
+        {
+          "table": "table1",
+          "mode": "update",
+          "key": "id"
+        },
+        {
+          "table": "table2",
+          "mode": "update",
+          "key": "id"
+        }
+      ]
+    }
+  ]
+}

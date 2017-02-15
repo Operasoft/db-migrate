@@ -1,7 +1,7 @@
 <?php
-require_once(__DIR__.'/DbStructure.inc.php');
+namespace DbMigrate\Comparator;
 
-class DbStructureCompare {
+class DbStructureComparator {
 	private $srcDb;
 	private $targetDb;
 	

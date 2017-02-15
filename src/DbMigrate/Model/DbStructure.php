@@ -1,6 +1,5 @@
 <?php
-require_once(__DIR__.'/DbTable.inc.php');
-require_once(__DIR__.'/DbField.inc.php');
+namespace DbMigrate\Model;
 
 class DbStructure {
 	public $db;

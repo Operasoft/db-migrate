@@ -1,3 +1,3 @@
-/*.sql
-/config.php
-/config-*.php
+/**/*.sql
+/etc/*.json
+/.idea

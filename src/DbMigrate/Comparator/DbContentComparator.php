@@ -1,11 +1,11 @@
 <?php
-require_once(__DIR__.'/DbStructure.inc.php');
+namespace DbMigrate\Comparator;
 
 /**
  * This class is used to compare the content of a table between two databases and generates the 
  * SQL migration script to synchronize the target DB with the source DB.
  */
-class DbContentCompare {
+class DbContentComparator {
 	private $dbStructure;
 	private $srcDb;
 	private $targetDb;
@@ -183,11 +183,19 @@ class DbContentCompare {
 			if (!isset($targetEntries[$key])) {
 				// This is a new entry, we need to migrate it
 				$proceed = true;
-			} else if (strtotime($entry['modified']) > strtotime($targetEntries[$key]['modified'])) {
-				// The entry on the source DB is more recent than the one on the target DB
-				echo "$key - Source date: ".$entry['modified']. " target date: ".$targetEntries[$key]['modified'];
-				$proceed = true;
-			}
+			} else if (isset($entry['modified'])) {
+                if (strtotime($entry['modified']) > strtotime($targetEntries[$key]['modified'])) {
+                    // The entry on the source DB is more recent than the one on the target DB
+                    echo "$key - Source date: ".$entry['modified']. " target date: ".$targetEntries[$key]['modified'];
+                    $proceed = true;
+                }
+            } else if (isset($entry['updated'])) {
+                if (strtotime($entry['updated']) > strtotime($targetEntries[$key]['updated'])) {
+                    // The entry on the source DB is more recent than the one on the target DB
+                    echo "$key - Source date: ".$entry['updated']. " target date: ".$targetEntries[$key]['updated'];
+                    $proceed = true;
+                }
+            }
 			
 			if ($proceed) {
 				// This entry does not exist in the target DB

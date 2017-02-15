@@ -1,4 +1,5 @@
 <?php
+namespace DbMigrate\Model;
 
 class DbTable {
 	public $name;
