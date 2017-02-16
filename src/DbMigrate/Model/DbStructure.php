@@ -7,6 +7,7 @@ class DbStructure {
 	public $name;
 	public $tables;
 	public $views;
+    public $triggers;
 
 	public function __construct($db, $name, $username) {
 		$this->db = $db;
@@ -14,6 +15,7 @@ class DbStructure {
 		$this->username = $username;
 		$this->tables = $this->loadTableStructure($db, $name);
 		$this->views = $this->loadViewStructure($db, $name);
+        $this->triggers = $this->loadTriggers($db);
 	}
 	
 	/**
@@ -112,5 +114,25 @@ class DbStructure {
 		
 		return $structure;
 	}
-	
+
+    /**
+     * @param \mysqli $db
+     *
+     * @return DbTrigger[]
+     */
+	public function loadTriggers($db) {
+        $triggers = array();
+
+        // List the tables
+        $result = $db->query("SHOW TRIGGERS");
+        if ($result) {
+            while ($row = $result->fetch_assoc()) {
+                $trigger = new DbTrigger($row['Trigger'], $row['Event'], $row['Table'], $row['Statement'], $row['Timing']);
+                $triggers[$trigger->getName()] = $trigger;
+            }
+            $result->free();
+        }
+
+        return $triggers;
+    }
 }
