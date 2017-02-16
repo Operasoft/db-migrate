@@ -155,8 +155,9 @@ class DbStructureComparator {
      */
     private function getDropTableScript($table) {
         $script = "-- OBSOLETE TABLE: $table".PHP_EOL;
-        $script .= "-- CHECK IF THE TABLE AS BEEN RENAMED. If not, uncomment the following script to drop it".PHP_EOL;
-        $script .= "-- DROP TABLE $table".PHP_EOL;
+        $script .= "-- CHECK IF THE TABLE AS BEEN RENAMED OR NEEDS TO BE DROPPED. Uncomment the appropriate script".PHP_EOL;
+        $script .= "-- RENAME TABLE $table TO <new_name>;".PHP_EOL;
+        $script .= "-- DROP TABLE $table;".PHP_EOL;
 
         return $script;
     }
@@ -294,8 +295,9 @@ class DbStructureComparator {
      */
     private function getDropFieldScript($table, $field) {
         $script = "-- OBSOLETE FIELD {$field->name} in table $table".PHP_EOL;
-        $script .= "-- CHECK IF THE FIELD AS BEEN RENAMED. If not, uncomment the following script to drop it".PHP_EOL;
-        $script .= "-- ALTER TABLE `$table` DROP COLUMN `{$field->name}`";
+        $script .= "-- CHECK IF THE FIELD AS BEEN RENAMED OR NEEDS TO BE DROPPED. Uncomment the appropriate script".PHP_EOL;
+        $script .= "-- ALTER TABLE `$table` CHANGE COLUMN `{$field->name}` `<new_name>` <definition>;".PHP_EOL;
+        $script .= "-- ALTER TABLE `$table` DROP COLUMN `{$field->name}`;";
 
         return $script;
     }

@@ -56,7 +56,7 @@ foreach ($config->getDbConfigs() as $dbConfig) {
 
         $script = implode(PHP_EOL, $scripts);
         if (!empty(trim($script))) {
-            file_put_contents($name, $script);
+            file_put_contents($name, 'USE '.$dbConfig->getTarget().';'.PHP_EOL.$script);
             echo "Schema migration script stored in file $name".PHP_EOL;
         } else {
             echo "NO SCHEMA MIGRATION REQUIRED".PHP_EOL;
@@ -81,7 +81,7 @@ foreach ($config->getDbConfigs() as $dbConfig) {
 
         $script = implode(PHP_EOL, $scripts);
         if (!empty(trim($script))) {
-            file_put_contents($name, $script);
+            file_put_contents($name, 'USE '.$dbConfig->getTarget().';'.PHP_EOL.$script);
             echo "Content migration script stored in file $name" . PHP_EOL;
         } else {
             echo "NO CONTENT MIGRATION REQUIRED".PHP_EOL;
