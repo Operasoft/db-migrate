@@ -5,6 +5,7 @@ class DbStructure {
 	public $db;
 	public $username;
 	public $name;
+	/** @var DbTable[]  */
 	public $tables;
 	public $views;
     public $triggers;
@@ -48,19 +49,20 @@ class DbStructure {
 			}
 			
 			// Extract each field
-			$result = $db->query("DESCRIBE $name");
+			$result = $db->query("SHOW FULL COLUMNS FROM $name");
 			if ($result) {
 				while ($row = $result->fetch_assoc()) {
 					$field = new DbField($row['Field'], $row['Type']);
 					if ($row['Null'] == 'YES') {
-						$field->nullable = true;
+						$field->setNullable(true);
 					} else {
-						$field->nullable = false;
+						$field->setNullable(false);
 					}
-					$field->key = $row['Key'];
-					$field->default = $row['Default'];
-					$field->extra = $row['Extra'];
-					$table->fields[$field->name] = $field;
+					$field->setKey($row['Key']);
+					$field->setDefault($row['Default']);
+					$field->setExtra($row['Extra']);
+                    $field->setComment($row['Comment']);
+					$table->fields[$field->getName()] = $field;
 				}
 				$result->free();
 			}
@@ -99,14 +101,14 @@ class DbStructure {
 				while ($row = $result->fetch_assoc()) {
 					$field = new DbField($row['Field'], $row['Type']);
 					if ($row['Null'] == 'YES') {
-						$field->nullable = true;
+						$field->setNullable(true);
 					} else {
-						$field->nullable = false;
+						$field->setNullable(false);
 					}
-					$field->key = $row['Key'];
-					$field->default = $row['Default'];
-					$field->extra = $row['Extra'];
-					$table->fields[$field->name] = $field;
+					$field->setKey($row['Key']);
+					$field->setDefault($row['Default']);
+					$field->setExtra($row['Extra']);
+					$table->fields[$field->getName()] = $field;
 				}
 				$result->free();
 			}

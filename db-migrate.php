@@ -1,7 +1,5 @@
 <?php
-spl_autoload_register(function ($class_name) {
-    require './src/'.str_replace("\\", "/",$class_name) . '.php';
-});
+require_once __DIR__.'/vendor/autoload.php';
 
 use DbMigrate\Comparator\DbContentComparator;
 use DbMigrate\Comparator\DbStructureComparator;

@@ -1,3 +1,6 @@
 /**/*.sql
 /etc/*.json
 /.idea
+/vendor
+/out/cache
+/out/**/*.php

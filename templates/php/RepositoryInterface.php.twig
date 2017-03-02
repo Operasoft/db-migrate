@@ -1,0 +1,74 @@
+<?php
+namespace {{ namespace.repository|path }};
+
+use Baseline\Component\DataModelHelpers\Exception\RepositoryException;
+use {{ namespace.model|path }}\{{ table.name|class }};
+
+/**
+ * Interface {{ table.name|class }}RepositoryInterface
+ * @package {{ namespace.repository|path }}
+ * @author db-template
+ */
+interface {{ table.name|class }}RepositoryInterface
+{
+    /**
+     * Inserts a new {{ table.name|class }}
+     *
+     * @param {{ table.name|class }} {{ table.name|variable }}
+     *
+     * @return {{ table.name|class }}
+     * @throws RepositoryException
+     */
+    public function insert({{ table.name|class }} {{ table.name|variable }});
+
+    /**
+     * Replaces an existing {{ table.name|class }}
+     *
+     * @param {{ table.name|class }} {{ table.name|variable }}
+     *
+     * @return {{ table.name|class }}
+     * @throws RepositoryException
+     */
+    public function replace({{ table.name|class }} {{ table.name|variable }});
+
+{% for field in table.fields %}
+{% if field.isPrimaryKey %}
+    /**
+     * Retrieves a {{ table.name|class }} by its primary id
+     *
+     * @param {{ field|type }} {{ field.comment }}
+     *
+     * @return {{ table.name|class }}|null
+     * @throws RepositoryException
+     */
+    public function getBy{{ field.name|class }}({{ field|variable }});
+
+{% endif %}
+{% if field.isUniqueKey %}
+    /**
+     * Retrieves a {{ table.name|class }} by its unique {{ field.name|words }}
+     *
+     * @param {{ field|type }} {{ field.comment }}
+     *
+     * @return {{ table.name|class }}|null
+     * @throws RepositoryException
+     */
+    public function getBy{{ field.name|class }}({{ field|variable }});
+
+{% endif %}
+{% if field.isIndexKey %}
+    /**
+     * Retrieves the list of {{ table.name|class }} for a given {{ field.name|words }}
+     *
+     * @param {{ field|type }} {{ field.comment }}
+     * @param int $offset The offset of the first element to retrieve
+     * @param int $size The maximum number elements to retrieve, 0 = all
+     *
+     * @return {{ table.name|class }}[]
+     * @throws RepositoryException
+     */
+    public function listBy{{ field.name|class }}({{ field|variable }}, $offset = 0, $size = 0);
+
+{% endif %}
+{% endfor %}
+}
