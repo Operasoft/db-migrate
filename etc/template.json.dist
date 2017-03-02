@@ -8,11 +8,11 @@
   "output": "./out",
   "databases": [
     {
-      "source": "db_name",
+      "name": "db_name",
       "namespace": {
-        "model": "Company.Project.Model",
-        "repository": "Company.Project.Repository",
-        "repository_doctrine": "Company.Project.Repository.Doctrine"
+        "model": "Company\\Project\\Model",
+        "repository": "Company\\Project\\Repository",
+        "repository_doctrine": "Company\\Project\\Repository\\Doctrine"
       },
       "excludes": ["acos", "tables_to_exclude_from_generation_list"],
       "constants": ["statuses", "table_with_constant_values"]

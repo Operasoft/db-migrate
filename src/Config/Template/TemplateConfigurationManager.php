@@ -35,7 +35,7 @@ class TemplateConfigurationManager
 
         $this->templateConfigs = array();
         foreach($json['databases'] as $db) {
-            $this->templateConfigs[] = new TemplateConfig($db['source'], $db['namespace'], $db['excludes'], $db['constants']);
+            $this->templateConfigs[] = new TemplateConfig($db['name'], $db['namespace'], $db['excludes'], $db['constants']);
         }
 
         if (isset($json['output'])) {

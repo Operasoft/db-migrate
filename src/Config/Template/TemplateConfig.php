@@ -8,8 +8,8 @@ namespace DbMigrate\Config\Template;
  */
 class TemplateConfig
 {
-    /** @var string The name of the database on the source host */
-    private $source;
+    /** @var string The name of the database on the name host */
+    private $name;
 
     /** @var array The list of namespaces defined */
     private $namespace;
@@ -22,13 +22,13 @@ class TemplateConfig
 
     /**
      * DbConfig constructor.
-     * @param string $source
+     * @param string $name
      * @param array $namespace
      * @param array $content
      */
-    public function __construct($source, $namespace, array $excludeList = null, array $constantsList = null)
+    public function __construct($name, $namespace, array $excludeList = null, array $constantsList = null)
     {
-        $this->source = $source;
+        $this->name = $name;
         $this->namespace = $namespace;
         $this->excludeList = $excludeList;
         $this->constantsList = $constantsList;
@@ -37,17 +37,17 @@ class TemplateConfig
     /**
      * @return string
      */
-    public function getSource()
+    public function getName()
     {
-        return $this->source;
+        return $this->name;
     }
 
     /**
-     * @param string $source
+     * @param string $name
      */
-    public function setSource($source)
+    public function setName($name)
     {
-        $this->source = $source;
+        $this->name = $name;
     }
 
     /**

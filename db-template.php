@@ -28,14 +28,14 @@ $source = $config->getSourceDb();
 foreach ($config->getTemplateConfigs() as $templateConfig) {
     //
     // Step 1: Setup DB connections
-    echo 'Connecting to source DB ' . $templateConfig->getSource() . '...' . PHP_EOL;
-    $mysqli = $source->connect($templateConfig->getSource());
+    echo 'Connecting to source DB ' . $templateConfig->getName() . '...' . PHP_EOL;
+    $mysqli = $source->connect($templateConfig->getName());
 
     $date = date('Y-m-d');
 
     //
     // Step 2: Load the source database structure
-    $structure = new DbStructure($mysqli, $templateConfig->getSource(), $source->getUsername());
+    $structure = new DbStructure($mysqli, $templateConfig->getName(), $source->getUsername());
 
     //
     // Step 3: Render the Model templates
