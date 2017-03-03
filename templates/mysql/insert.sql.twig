@@ -1,0 +1,8 @@
+'INSERT INTO `' . self::TABLE_NAME . '`
+(
+{% for table.fields as field %}
+{% if field.isPrimaryKey and field.isUuid %}
+{% else if not field.isGenerated %}
+{% endif %}
+{% endfor %}
+)'

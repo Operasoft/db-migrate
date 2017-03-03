@@ -2,6 +2,9 @@
 namespace {{ namespace.repository_doctrine|path }};
 
 use Baseline\Component\DataModelHelpers\Exception\RepositoryException;
+{% if table.getPrimaryField.isUuid %}
+use Baseline\Component\DataModelHelpers\Generator\UuidGenerator;
+{% endif %}
 use {{ namespace.model|path }}\{{ table.name|class }};
 use Doctrine\DBAL\Driver\Connection;
 
@@ -34,12 +37,19 @@ class Doctrine{{ table.name|class }}Repository implements {{ table.name|class }}
     public function insert({{ table.name|class }} {{ table.name|variable }})
     {
         try {
+{% if table.getPrimaryField.isUuid %}
+            {{ table.name|variable }}->{{ table.getPrimaryField|setter }}(UuidGenerator::v4());
+
+{% endif %}
             $query = 'INSERT INTO `' . self::TABLE_NAME . '`
                       ({{ editableFields(table) }})
                       VALUES ({{ pdoVariables(table) }})';
 
             $stmt = $this->connection->prepare($query);
 
+{% if table.getPrimaryField.isUuid %}
+            $stmt->bindValue('{{ table.getPrimaryField.name }}', {{ table.name|variable }}->{{ table.getPrimaryField|getter }});
+{% endif %}
 {% for field in table.fields %}
 {% if not field.isGenerated %}
             $stmt->bindValue('{{ field.name }}', {{ table.name|variable }}->{{ field|getter }} ? {{ table.name|variable }}->{{ field|getter }} : \PDO::PARAM_NULL);
@@ -50,8 +60,10 @@ class Doctrine{{ table.name|class }}Repository implements {{ table.name|class }}
 
 {% if table.getPrimaryField.isAutoIncrement %}
             {{ table.name|variable }}->{{ table.getPrimaryField|setter }}((int) $this->connection->lastInsertId());
-{% elseif table.getPrimaryField %}
-            {{ table.name|variable }} = $this->getBy{{ field.name|class }}({{ table.name|variable }}->{{ field|getter }});
+{% endif %}
+
+{% if table.getPrimaryField %}
+            {{ table.name|variable }} = $this->getBy{{ table.getPrimaryField.name|class }}({{ table.name|variable }}->{{ table.getPrimaryField|getter }});
 {% endif %}
 
             return {{ table.name|variable }};
@@ -163,7 +175,7 @@ class Doctrine{{ table.name|class }}Repository implements {{ table.name|class }}
         try {
             $query = 'SELECT * FROM `' . self::TABLE_NAME . '` WHERE `{{ field.name }}` = :{{ field.name }}';
             if ($limit > 0) {
-                $query .= ' LIMIT :limit OFFSET :offset'
+                $query .= ' LIMIT :limit OFFSET :offset';
             }
 
             $stmt = $this->connection->prepare($query);

@@ -219,7 +219,7 @@ class TwigExtension extends \Twig_Extension
 
         foreach ($table->getFields() as $field) {
             if ($includePrimaryKey && $field->isPrimaryKey() && $field->isUuid()) {
-                $values[] = 'UUID()';
+                $values[] = ':'.$field->getName();
             } else if (!$field->isGenerated()) {
                 $values[] = ':'.$field->getName();
             }
