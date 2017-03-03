@@ -2,7 +2,9 @@
 namespace DbMigrate\Twig;
 
 use DbMigrate\Model\DbField;
+use DbMigrate\Model\DbTable;
 use Doctrine\Common\Inflector\Inflector;
+use Twig_Function;
 
 /**
  * Class TwigExtension
@@ -26,6 +28,15 @@ class TwigExtension extends \Twig_Extension
             new \Twig_SimpleFilter('getter', [$this, 'getterFilter']),
             new \Twig_SimpleFilter('setter', [$this, 'setterFilter']),
             new \Twig_SimpleFilter('type', [$this, 'typeFilter'])
+        );
+    }
+
+    public function getFunctions()
+    {
+        return array(
+            new Twig_Function('editableFields', [$this, 'generateEditableFields'], array('is_safe' => array('html'))),
+            new Twig_Function('pdoVariables', [$this, 'generatePdoVariables'], array('is_safe' => array('html'))),
+            new Twig_Function('pdoUpdate', [$this, 'generatePdoUpdate'], array('is_safe' => array('html')))
         );
     }
 
@@ -185,5 +196,50 @@ class TwigExtension extends \Twig_Extension
         }
 
         return $type;
+    }
+
+    public function generateEditableFields(DbTable $table, $includePrimaryKey = true)
+    {
+        $fields = array();
+
+        foreach ($table->getFields() as $field) {
+            if ($includePrimaryKey && $field->isPrimaryKey() && $field->isUuid()) {
+                $fields[] = '`'.$field->getName().'`';
+            } else if (!$field->isGenerated()) {
+                $fields[] = '`'.$field->getName().'`';
+            }
+        }
+
+        return implode(', ', $fields);
+    }
+
+    public function generatePdoVariables(DbTable $table, $includePrimaryKey = true)
+    {
+        $values = array();
+
+        foreach ($table->getFields() as $field) {
+            if ($includePrimaryKey && $field->isPrimaryKey() && $field->isUuid()) {
+                $values[] = 'UUID()';
+            } else if (!$field->isGenerated()) {
+                $values[] = ':'.$field->getName();
+            }
+        }
+
+        return implode(', ', $values);
+    }
+
+    public function generatePdoUpdate(DbTable $table, $includePrimaryKey = false)
+    {
+        $values = array();
+
+        foreach ($table->getFields() as $field) {
+            if ($includePrimaryKey && $field->isPrimaryKey()) {
+                $values[] = '`'.$field->getName().'` = :'.$field->getName();
+            } else if (!$field->isGenerated() && !$field->isPrimaryKey()) {
+                $values[] = '`'.$field->getName().'` = :'.$field->getName();
+            }
+        }
+
+        return implode(', ', $values);
     }
 }

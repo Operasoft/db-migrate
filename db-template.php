@@ -52,6 +52,9 @@ foreach ($config->getTemplateConfigs() as $templateConfig) {
             if (isset($templateConfig->getNamespace()['repository'])) {
                 $generator->renderRepositoryInterface($templateConfig, $table);
             }
+            if (isset($templateConfig->getNamespace()['repository_doctrine'])) {
+                $generator->renderDoctrineRepository($templateConfig, $table);
+            }
         } else {
             DbTableLoader::loadConstants($mysqli, $table);
             if (isset($templateConfig->getNamespace()['model'])) {

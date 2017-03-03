@@ -105,6 +105,27 @@ class TemplateGenerator
         $this->saveToFile($content, $filename);
     }
 
+    public function renderDoctrineRepository(TemplateConfig $config, DbTable $table)
+    {
+        $template = $this->twig->load('DoctrineRepository.php.twig');
+
+        $context = array(
+            'table' => $table,
+            'namespace' => $config->getNamespace());
+
+        $content = $template->render($context);
+
+        // Prepare the filename where the content must be dumped
+        $filename = $this->folder;
+        if (isset($config->getNamespace()['repository_doctrine'])) {
+            $filename .= DIRECTORY_SEPARATOR.str_replace('.', DIRECTORY_SEPARATOR, $config->getNamespace()['repository_doctrine']);
+        }
+
+        $filename .= DIRECTORY_SEPARATOR.'Doctrine'.$this->twigExtension->classFilter($table->name).'Repository.php';
+
+        $this->saveToFile($content, $filename);
+    }
+
     /**
      * @param string $content
      * @param string $filename
