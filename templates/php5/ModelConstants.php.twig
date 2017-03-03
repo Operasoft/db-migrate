@@ -1,0 +1,21 @@
+<?php
+namespace {{ namespace.model|path }};
+
+/**
+ * Class {{ table.name|class }}
+ * @package {{ namespace.model|path }}
+ * @author db-template
+ */
+class {{ table.name|class }}
+{
+{% for key,value in table.data %}
+{% if value.description %}
+    /** {{ value.description }} */
+{% endif %}
+{% if primaryKey.isString %}
+    const {{ value.name|upper }} = '{{ key }}';
+{% else %}
+    const {{ value.name|upper }} = {{ key }};
+{% endif %}
+{% endfor %}
+}

@@ -1,0 +1,42 @@
+<?php
+namespace {{ namespace.model|path }};
+
+use Baseline\Component\DataModelHelpers\Model\Model;
+
+/**
+ * Class {{ table.name|singular|title }}
+ * @package {{ namespace.model|path }}
+ * @author db-template
+ */
+class {{ table.name|class }} extends Model
+{
+{% for field in table.fields %}
+    /** @var {{ field|type }} {{ field.comment }} */
+{% if not field.isGenerated and field.default and field.isString %}
+    protected ${{ field.name|camel }} = '{{ field.default }}';
+{% elseif not field.isGenerated and field.default %}
+    protected ${{ field.name|camel }} = {{ field.default }};
+{% else %}
+    protected ${{ field.name|camel }};
+{% endif %}
+{% endfor %}
+
+{% for field in table.fields %}
+    /**
+     * @return {{ field|type }}
+     */
+    public function {{ field|getter }}
+    {
+        return $this->{{ field.name|camel }};
+    }
+
+    /**
+     * @param {{ field|type }} ${{ field.name|camel }}
+     */
+    public function {{ field|setter }}(${{ field.name|camel }})
+    {
+        return $this->{{ field.name|camel }} = ${{ field.name|camel }};
+    }
+
+{% endfor %}
+}

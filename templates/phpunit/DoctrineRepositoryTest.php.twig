@@ -1,0 +1,38 @@
+<?php
+namespace {{ namespace.repository_doctrine|path }};
+
+use Baseline\Component\DataModelHelpers\Test;
+use {{ namespace.model|path }}\{{ table.name|class }};
+use Doctrine\DBAL\Driver\Connection;
+use Doctrine\DBAL\Driver\Statement;
+
+/**
+ * Class Doctrine{{ table.name|class }}RepositoryTest
+ * @package {{ namespace.repository_doctrine|path }}
+ * @author db-template
+ */
+class Doctrine{{ table.name|class }}RepositoryTest extends DoctrineTestCase
+{
+    /**
+     * @var Doctrine{{ table.name|class }}Repository
+     */
+    protected $repo;
+
+    /**
+     * @var \PHPUnit_Framework_MockObject_MockObject|Connection
+     */
+    protected $mockConnection;
+
+    /**
+     * @var \PHPUnit_Framework_MockObject_MockObject|Statement
+     */
+    protected $mockStatement;
+
+    public function setUp()
+    {
+        $this->repo = new Doctrine{{ table.name|class }}Repository(self::getDoctrineConnexion());
+        $this->mockConnection = $this->getMockBuilder('Doctrine\DBAL\Driver\Connection')->getMock();
+        $this->mockStatement = $this->getMockBuilder('Doctrine\DBAL\Driver\Statement')->getMock();
+    }
+
+}

@@ -1,0 +1,211 @@
+<?php
+namespace {{ namespace.repository_doctrine|path }};
+
+use Baseline\Component\DataModelHelpers\Exception\RepositoryException;
+{% if table.getPrimaryField.isUuid %}
+use Baseline\Component\DataModelHelpers\Generator\UuidGenerator;
+{% endif %}
+use {{ namespace.model|path }}\{{ table.name|class }};
+use Doctrine\DBAL\Driver\Connection;
+
+
+/**
+ * Class Doctrine{{ table.name|class }}Repository
+ * @package {{ namespace.repository_doctrine|path }}
+ * @author db-template
+ */
+class Doctrine{{ table.name|class }}Repository implements {{ table.name|class }}RepositoryInterface
+{
+    const TABLE_NAME = '{{ table.name }}';
+
+    /**
+     * @var Connection
+     */
+    private $connection;
+
+    /**
+     * @param Connection $connection
+     */
+    public function __construct(Connection $connection)
+    {
+        $this->connection = $connection;
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public function insert({{ table.name|class }} {{ table.name|variable }})
+    {
+        try {
+{% if table.getPrimaryField.isUuid %}
+            {{ table.name|variable }}->{{ table.getPrimaryField|setter }}(UuidGenerator::v4());
+
+{% endif %}
+            $query = 'INSERT INTO `' . self::TABLE_NAME . '`
+                      ({{ editableFields(table) }})
+                      VALUES ({{ pdoVariables(table) }})';
+
+            $stmt = $this->connection->prepare($query);
+
+{% if table.getPrimaryField.isUuid %}
+            $stmt->bindValue('{{ table.getPrimaryField.name }}', {{ table.name|variable }}->{{ table.getPrimaryField|getter }});
+{% endif %}
+{% for field in table.fields %}
+{% if not field.isGenerated %}
+            $stmt->bindValue('{{ field.name }}', {{ table.name|variable }}->{{ field|getter }} ? {{ table.name|variable }}->{{ field|getter }} : \PDO::PARAM_NULL);
+{% endif %}
+{% endfor %}
+
+            $stmt->execute();
+
+{% if table.getPrimaryField.isAutoIncrement %}
+            {{ table.name|variable }}->{{ table.getPrimaryField|setter }}((int) $this->connection->lastInsertId());
+{% endif %}
+
+{% if table.getPrimaryField %}
+            {{ table.name|variable }} = $this->getBy{{ table.getPrimaryField.name|class }}({{ table.name|variable }}->{{ table.getPrimaryField|getter }});
+{% endif %}
+
+            return {{ table.name|variable }};
+        } catch (\Exception $e) {
+            throw new RepositoryException($e->getMessage(), $e->getCode());
+        }
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public function replace({{ table.name|class }} {{ table.name|variable }})
+    {
+        try {
+            $query = 'UPDATE `' . self::TABLE_NAME . '` SET
+                     ({{ pdoUpdate(table) }})
+                     WHERE (`{{ table.getPrimaryField.name }}` = :id)';
+
+            $stmt = $this->connection->prepare($query);
+
+            $stmt->bindValue('id', {{ table.name|variable }}->{{ table.getPrimaryField|getter }});
+{% for field in table.fields %}
+{% if not field.isGenerated and not field.isPrimaryKey %}
+            $stmt->bindValue('{{ field.name }}', {{ table.name|variable }}->{{ field|getter }} ? {{ table.name|variable }}->{{ field|getter }} : \PDO::PARAM_NULL);
+{% endif %}
+{% endfor %}
+
+            return $stmt->execute();
+        } catch (\Exception $e) {
+            throw new RepositoryException($e->getMessage(), $e->getCode());
+        }
+    }
+
+{% for field in table.fields %}
+{% if field.isPrimaryKey %}
+    /**
+     * @inheritdoc
+     */
+    public function getBy{{ field.name|class }}({{ field|variable }})
+    {
+        try {
+            $query = 'SELECT * FROM `' . self::TABLE_NAME . '` WHERE `{{ field.name }}` = :{{ field.name }}';
+
+            $stmt = $this->connection->prepare($query);
+{% if field.isInteger %}
+            $stmt->bindValue('{{ field.name }}', (int) {{ field|variable }}, PDO::PARAM_INT);
+{% elseif field.isFloat %}
+            $stmt->bindValue('{{ field.name }}', (float) {{ field|variable }}, PDO::PARAM_FLOAT);
+{% else %}
+            $stmt->bindValue('{{ field.name }}', {{ field|variable }});
+{% endif %}
+            $stmt->execute();
+
+            $row = $stmt->fetch();
+
+            {{ table.name|variable }} = null;
+            if ($row !== false) {
+                {{ table.name|variable }} = new {{ table.name|class }}();
+                {{ table.name|variable }}->fillFromArray($row);
+            }
+
+            return {{ table.name|variable }};
+        } catch (\Exception $e) {
+            throw new RepositoryException($e->getMessage(), $e->getCode());
+        }
+    }
+
+{% endif %}
+{% if field.isUniqueKey %}
+    /**
+     * @inheritdoc
+     */
+    public function getBy{{ field.name|class }}({{ field|variable }})
+    {
+        try {
+            $query = 'SELECT * FROM `' . self::TABLE_NAME . '` WHERE `{{ field.name }}` = :{{ field.name }}';
+
+            $stmt = $this->connection->prepare($query);
+{% if field.isInteger %}
+            $stmt->bindValue('{{ field.name }}', (int) {{ field|variable }}, PDO::PARAM_INT);
+{% elseif field.isFloat %}
+            $stmt->bindValue('{{ field.name }}', (float) {{ field|variable }}, PDO::PARAM_FLOAT);
+{% else %}
+            $stmt->bindValue('{{ field.name }}', {{ field|variable }});
+{% endif %}
+            $stmt->execute();
+
+            $row = $stmt->fetch();
+
+            {{ table.name|variable }} = null;
+            if ($row !== false) {
+                {{ table.name|variable }} = new {{ table.name|class }}();
+                {{ table.name|variable }}->fillFromArray($row);
+            }
+
+            return {{ table.name|variable }};
+        } catch (\Exception $e) {
+            throw new RepositoryException($e->getMessage(), $e->getCode());
+        }
+    }
+
+{% endif %}
+{% if field.isIndexKey %}
+    /**
+     * @inheritdoc
+     */
+    public function listBy{{ field.name|class }}({{ field|variable }}, $offset = 0, $limit = 0)
+    {
+        try {
+            $query = 'SELECT * FROM `' . self::TABLE_NAME . '` WHERE `{{ field.name }}` = :{{ field.name }}';
+            if ($limit > 0) {
+                $query .= ' LIMIT :limit OFFSET :offset';
+            }
+
+            $stmt = $this->connection->prepare($query);
+            if ($limit > 0) {
+                $stmt->bindValue('limit', (int) $limit, PDO::PARAM_INT);
+                $stmt->bindValue('offset', (int) $offset, PDO::PARAM_INT);
+            }
+{% if field.isInteger %}
+            $stmt->bindValue('{{ field.name }}', (int) {{ field|variable }}, PDO::PARAM_INT);
+{% elseif field.isFloat %}
+            $stmt->bindValue('{{ field.name }}', (float) {{ field|variable }}, PDO::PARAM_FLOAT);
+{% else %}
+            $stmt->bindValue('{{ field.name }}', {{ field|variable }} ? {{ field|variable }} : \PDO::PARAM_NULL);
+{% endif %}
+            $stmt->execute();
+
+            $rows = $stmt->fetchAll();
+            $list = array();
+            foreach ($rows as $row) {
+                {{ table.name|variable }} = new {{ table.name|class }}();
+                {{ table.name|variable }}->fillFromArray($row);
+                $list[] = {{ table.name|variable }};
+            }
+
+            return $list;
+        } catch (\Exception $e) {
+            throw new RepositoryException($e->getMessage(), $e->getCode());
+        }
+    }
+
+{% endif %}
+{% endfor %}
+}

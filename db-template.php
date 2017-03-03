@@ -2,9 +2,10 @@
 require_once __DIR__.'/vendor/autoload.php';
 
 use DbMigrate\Config\Template\TemplateConfigurationManager;
-use DbMigrate\Generator\TemplateGenerator;
+use DbMigrate\Renderer\PhpTemplateRenderer;
 use DbMigrate\Loader\DbTableLoader;
 use DbMigrate\Model\DbStructure;
+use DbMigrate\Renderer\PhpUnitTemplateRenderer;
 
 //-----------------------------------------------------------------------------
 // MAIN LOOP
@@ -19,10 +20,10 @@ echo "Using config file: ".$argv[1].PHP_EOL;
 $config = new TemplateConfigurationManager();
 $config->load($argv[1]);
 
-// Prepare the template generator
-$loader = new Twig_Loader_Filesystem(__DIR__.'/templates/php');
+// Prepare the template renderers
+$phpRenderer = new PhpTemplateRenderer(new Twig_Loader_Filesystem(__DIR__.'/templates/php'), $config->getOutput().'/src');
+$phpUnitRenderer = new PhpUnitTemplateRenderer(new Twig_Loader_Filesystem(__DIR__.'/templates/phpunit'), $config->getOutput().'/tests');
 
-$generator = new TemplateGenerator($loader, $config->getOutput());
 $source = $config->getSourceDb();
 
 foreach ($config->getTemplateConfigs() as $templateConfig) {
@@ -47,18 +48,20 @@ foreach ($config->getTemplateConfigs() as $templateConfig) {
 
         if (!$templateConfig->isConstant($table->name)) {
             if (isset($templateConfig->getNamespace()['model'])) {
-                $generator->renderModel($templateConfig, $table);
+                $phpRenderer->renderModel($templateConfig, $table);
             }
             if (isset($templateConfig->getNamespace()['repository'])) {
-                $generator->renderRepositoryInterface($templateConfig, $table);
+                $phpRenderer->renderRepositoryInterface($templateConfig, $table);
             }
             if (isset($templateConfig->getNamespace()['repository_doctrine'])) {
-                $generator->renderDoctrineRepository($templateConfig, $table);
+                $phpRenderer->renderDoctrineRepository($templateConfig, $table);
+                $phpUnitRenderer->renderDoctrineRepositoryTest($templateConfig, $table);
+
             }
         } else {
             DbTableLoader::loadConstants($mysqli, $table);
             if (isset($templateConfig->getNamespace()['model'])) {
-                $generator->renderModelConstants($templateConfig, $table);
+                $phpRenderer->renderModelConstants($templateConfig, $table);
             }
         }
     }
