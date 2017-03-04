@@ -1,21 +1,82 @@
 <?php
 namespace {{ namespace.model|path }};
 
+use UnexpectedValueException;
+
 /**
- * Class {{ table.name|class }}
+ * Class {{ table|class }}
  * @package {{ namespace.model|path }}
  * @author db-template
  */
-class {{ table.name|class }}
+class {{ table|class }}
 {
 {% for key,value in table.data %}
 {% if value.description %}
     /** {{ value.description }} */
 {% endif %}
 {% if primaryKey.isString %}
-    const {{ value.name|upper }} = '{{ key }}';
+    const {{ value.name|constant }} = '{{ key }}';
 {% else %}
-    const {{ value.name|upper }} = {{ key }};
+    const {{ value.name|constant }} = {{ key }};
 {% endif %}
 {% endfor %}
+
+    /** @var int[] associative array to find a constant value by its name */
+    static private $nameMap;
+
+    /** @var string[] associative array to find a constant name by its value */
+    static private $idMap;
+
+    /**
+     * Returns a constant value from its name.
+
+     * @param $name string The constant name to map
+     */
+    static public function fromName($name)
+    {
+        if (self::$nameMap === null) {
+            self::initMaps();
+        }
+
+        $value = self::$nameMap['name'];
+        if (empty($value) {
+            throw new UnexpectedValueException('Unknown {{ table|class }} name received: ' . $name . '. Expected values: '.implode(',', array_keys(self::$nameMap)) );
+        }
+        return $value;
+    }
+
+    /**
+     * Returns a constant name from its value.
+
+     * @param $value string The constant value to map
+     */
+    static public function toName($id)
+    {
+        if (self::$idMap === null) {
+            self::initMaps();
+        }
+
+        $value = self::$idMap['id'];
+        if (empty($value) {
+            throw new UnexpectedValueException('Unknown {{ table|class }} id received: ' . $id . '. Expected values: '.implode(',', array_keys(self::$idMap)) );
+        }
+        return $value;
+    }
+
+    static private function initMaps()
+    {
+        self::$nameMap = array();
+        self::$idMap = array();
+
+{% for key,value in table.data %}
+{% if primaryKey.isString %}
+        self::$nameMap['{{ value.name|constant|lower }}'] = '{{ key }}';
+        self::$idMap['{{ key }}'] = '{{ value.name|constant|lower }}';
+{% else %}
+        self::$nameMap['{{ value.name|constant|lower }}'] = {{ key }};
+        self::$idMap[{{ key }}] = '{{ value.name|constant|lower }}';
+{% endif %}
+
+{% endfor %}
+    }
 }

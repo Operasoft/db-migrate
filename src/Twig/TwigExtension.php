@@ -23,6 +23,7 @@ class TwigExtension extends \Twig_Extension
             new \Twig_SimpleFilter('camel', [$this, 'camelFilter']),
             new \Twig_SimpleFilter('path', [$this, 'pathFilter']),
             new \Twig_SimpleFilter('class', [$this, 'classFilter']),
+            new \Twig_SimpleFilter('constant', [$this, 'constantFilter']),
             new \Twig_SimpleFilter('field', [$this, 'variableFilter']),
             new \Twig_SimpleFilter('variable', [$this, 'variableFilter']),
             new \Twig_SimpleFilter('getter', [$this, 'getterFilter']),
@@ -49,89 +50,91 @@ class TwigExtension extends \Twig_Extension
      */
     public function pluralFilter($str)
     {
-        return Inflector::pluralize($str);
+        return Inflector::pluralize($this->getName($str));
     }
 
     /**
      * Filters a string to tranform it to its singular equivalent. Converts 'Tables' to 'Table'.
      *
-     * @param  string $str
+     * @param  mixed $str
      *
      * @return string
      */
     public function singularFilter($str)
     {
-        return Inflector::singularize($str);
+        return Inflector::singularize($this->getName($str));
     }
 
     /**
      * Filters a string to tranform it to its camel case equivalent. Converts 'table_name' to 'table name'.
      *
-     * @param  string $str
+     * @param  mixed $str
      *
      * @return string
      */
     public function wordsFilter($str)
     {
-        return str_replace('_', ' ', $str);
+        return str_replace('_', ' ', $this->getName($str));
     }
 
     /**
      * Filters a string to tranform it to its camel case equivalent. Converts 'table_name' to 'tableName'.
      *
-     * @param  string $str
+     * @param  mixed $str
      *
      * @return string
      */
     public function camelFilter($str)
     {
-        return Inflector::camelize($str);
+        return Inflector::camelize($this->getName($str));
     }
 
     /**
      * Filters a string to tranform it to its class name. Converts 'table_names' to 'TableName'.
      *
-     * @param  string $str
+     * @param  mixed $str
      *
      * @return string
      */
     public function classFilter($str)
     {
-        return Inflector::singularize(Inflector::classify($str));
+        return Inflector::singularize(Inflector::classify($this->getName($str)));
+    }
+
+    /**
+     * Filters a string to tranform it to its constant name. Converts 'constant value' to 'CONSTANT_VALUE'.
+     *
+     * @param  mixed $str
+     *
+     * @return string
+     */
+    public function constantFilter($str)
+    {
+        return str_replace(' ', '_', strtoupper($this->getName($str)));
     }
 
     /**
      * Filters a string to tranform it to its variable name. Converts 'table_names' to '$tableName'.
      *
-     * @param  string $str
+     * @param  mixed $str
      *
      * @return string
      */
-    public function variableFilter($field)
+    public function variableFilter($str)
     {
-        $name = $field;
-        if ($field instanceof DbField) {
-            $name = $field->getName();
-        }
-
-        return '$'.Inflector::singularize(Inflector::camelize($name));
+        return '$'.Inflector::singularize(Inflector::camelize($this->getName($str)));
     }
 
     /**
      * Filters a string to tranform it to its field name. Converts 'table_names' to '$this->tableName'.
      *
-     * @param  string $str
+     * @param  mixed $str
      *
      * @return string
      */
-    public function fieldFilter($field)
+    public function fieldFilter($str)
     {
-        $name = $field;
-        if ($field instanceof DbField) {
-            $name = $field->getName();
-        }
-
-        return '$this->'.Inflector::singularize(Inflector::camelize($name));
+        return '$this->'.Inflector::singularize(Inflector::camelize($this->getName($str)));
     }
 
     /**
@@ -147,34 +150,23 @@ class TwigExtension extends \Twig_Extension
     }
 
     /**
-     * @param string|DbField $field
+     * @param mixed $str
      */
-    public function getterFilter($field)
+    public function getterFilter($str)
     {
         $prefix = 'get';
-        $name = $field;
-        if ($field instanceof DbField) {
-            if ($field->isBoolean()) {
-                $prefix = 'is';
-            }
-            $name = $field->getName();
-        }
 
-        return $prefix.$this->classFilter($this->singularFilter($name)).'()';
+        return $prefix.$this->classFilter($this->singularFilter($this->getName($str))).'()';
     }
 
     /**
-     * @param string|DbField $field
+     * @param mixed $str
      */
-    public function setterFilter($field)
+    public function setterFilter($str)
     {
         $prefix = 'set';
-        $name = $field;
-        if ($field instanceof DbField) {
-            $name = $field->getName();
-        }
 
-        return $prefix.$this->classFilter($this->singularFilter($name));
+        return $prefix.$this->classFilter($this->singularFilter($this->getName($str)));
     }
 
     /**
@@ -241,5 +233,16 @@ class TwigExtension extends \Twig_Extension
         }
 
         return implode(', ', $values);
+    }
+
+    private function getName($value) {
+        $name = $value;
+        if ($value instanceof DbField) {
+            $name = $value->getName();
+        } elseif ($value instanceof DbTable) {
+            $name = $value->getName();
+        }
+
+        return $name;
     }
 }
