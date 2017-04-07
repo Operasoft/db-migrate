@@ -1,6 +1,8 @@
 <?php
 namespace DbMigrate\Comparator;
 
+use DbMigrate\Model\DbForeignKey;
+
 class DbStructureComparator {
 	private $srcDb;
 	private $targetDb;
@@ -115,6 +117,29 @@ class DbStructureComparator {
                 $scripts[] = $this->getDropTriggerScript($name);
             }
         }
+        echo PHP_EOL;
+
+        // Comparing foreign keys
+        echo "Comparing foreign keys... ";
+        foreach ($this->srcDb->foreignKeys as $name => $key) {
+            if (!isset($this->targetDb->foreignKeys[$name])) {
+                echo PHP_EOL."\tForeign key $name not found in ". $this->targetDb->name;
+                $error = true;
+                $scripts[] = $this->getCreateForeignKeyScript($this->srcDb->db, $key, $this->srcDb->username, $this->targetDb->username);
+            } else if (!$key->equals($this->targetDb->foreignKeys[$name])) {
+                echo PHP_EOL."\tForeign key $name has changed";
+                $scripts[] = $this->getAlterForeignKeyScript($this->srcDb->db, $key, $this->srcDb->username, $this->targetDb->username);
+            }
+        }
+
+        // Check for triggers that are only on the target DB
+        foreach ($this->targetDb->foreignKeys as $name => $key) {
+            if (!isset($this->srcDb->foreignKeys[$name])) {
+                echo PHP_EOL."\tForeign key $name not found in ". $this->srcDb->name;
+                $error = true;
+                $scripts[] = $this->getDropForeignKeyScript($key);
+            }
+        }
 
         if ($error == false) {
             echo "OK";
@@ -155,9 +180,11 @@ class DbStructureComparator {
      */
     private function getDropTableScript($table) {
         $script = "-- OBSOLETE TABLE: $table".PHP_EOL;
-        $script .= "-- CHECK IF THE TABLE AS BEEN RENAMED OR NEEDS TO BE DROPPED. Uncomment the appropriate script".PHP_EOL;
+        $script .= "-- **** IF THE TABLE HAS BEEN RENAMED, uncomment this script:****".PHP_EOL;
         $script .= "-- RENAME TABLE $table TO <new_name>;".PHP_EOL;
+        $script .= "-- **** IF THE TABLE HAS BEEN DROPPED, uncomment this script:****".PHP_EOL;
         $script .= "-- DROP TABLE $table;".PHP_EOL;
+        $script .= PHP_EOL;
 
         return $script;
     }
@@ -175,12 +202,12 @@ class DbStructureComparator {
 				if ($field->type != $field2->type) {
 					$reason = "ERROR: Field $name has a different type: $db1_name.". $field->type . " : $db2_name.". $field2->type;
 					$msg[] = $reason;
-					$scripts[] = $this->getAlterFieldScript($table1->name, $field, $reason);
+					$scripts[] = $this->getAlterFieldScript($table1->name, $field, $reason, $field->key != $field2->key);
 				}
 				if ($field->nullable != $field2->nullable) {
 					$reason = "WARNING: Field $name has a different nullable value: $db1_name.". $field->nullable . " : $db2_name.". $field2->nullable;
 					$msg[] = $reason;
-					$scripts[] = $this->getAlterFieldScript($table1->name, $field, $reason);
+					$scripts[] = $this->getAlterFieldScript($table1->name, $field, $reason, $field->key != $field2->key);
 				}
 				if ($field->key != $field2->key) {
 					$msg[] = "ERROR: Field $name has a different key value: $db1_name.". $field->key . " : $db2_name.". $field2->key;
@@ -232,7 +259,7 @@ class DbStructureComparator {
 		
 		$key = "";
 		if ($field->key == "PRI") {
-			$key = ", ADD PRIMARY KEY (`{$field->name}`)";	
+			$key = " PRIMARY KEY {$field->extra}";
 		} else if ($field->key == 'MUL') {
 			$key = ", ADD KEY `{$field->name}` (`{$field->name}`)";
 		} else if ($field->key == 'UNI') {
@@ -240,7 +267,7 @@ class DbStructureComparator {
 		}
 		
 		if (empty($after)) {
-			$SQL = "ALTER TABLE `$table` ADD `{$field->name}` {$field->type} $options $key;";
+			$SQL = "ALTER TABLE `$table` ADD `{$field->name}` {$field->type} $options $key FIRST;";
 		} else {
 			$SQL = "ALTER TABLE `$table` ADD `{$field->name}` {$field->type} $options AFTER `$after` $key;";
 		}
@@ -254,7 +281,7 @@ class DbStructureComparator {
 	/**
 	 * Creates the SQL script to modify an existing field in an existing table
 	 */
-	private function getAlterFieldScript ($table, $field, $reason) {
+	private function getAlterFieldScript ($table, $field, $reason, $differentKey) {
 		$script = "";
 		
 		$options = "";
@@ -272,16 +299,18 @@ class DbStructureComparator {
 		} else if ($field->nullable) {
 			$options .= " DEFAULT NULL";
 		}
-		
-		$key = "";
-		if ($field->key == "PRI") {
-			$key = ", ADD PRIMARY KEY (`{$field->name}`)";
-		} else if ($field->key == 'MUL') {
-			$key = ", ADD KEY `{$field->name}` (`{$field->name}`)";
-		} else if ($field->key == 'UNI') {
-			$key = ", ADD UNIQUE (`{$field->name}`)";
-		}
-		
+
+        $key = "";
+		if ($differentKey) {
+            if ($field->key == "PRI") {
+                $key = ", ADD PRIMARY KEY (`{$field->name}`) {$field->extra}";
+            } else if ($field->key == 'MUL') {
+                $key = ", ADD KEY `{$field->name}` (`{$field->name}`)";
+            } else if ($field->key == 'UNI') {
+                $key = ", ADD UNIQUE (`{$field->name}`)";
+            }
+        }
+
 		$SQL = "ALTER TABLE `$table` CHANGE `{$field->name}` `{$field->name}` {$field->type} $options $key;";
 		
 		$script .= "-- MODIFY FIELD {$field->name} in table $table".PHP_EOL."-- Reason: $reason".PHP_EOL;
@@ -295,9 +324,11 @@ class DbStructureComparator {
      */
     private function getDropFieldScript($table, $field) {
         $script = "-- OBSOLETE FIELD {$field->name} in table $table".PHP_EOL;
-        $script .= "-- CHECK IF THE FIELD AS BEEN RENAMED OR NEEDS TO BE DROPPED. Uncomment the appropriate script".PHP_EOL;
+        $script .= "-- **** IF THE FIELD HAS BEEN RENAMED, uncomment this script: ****".PHP_EOL;
         $script .= "-- ALTER TABLE `$table` CHANGE COLUMN `{$field->name}` `<new_name>` <definition>;".PHP_EOL;
-        $script .= "-- ALTER TABLE `$table` DROP COLUMN `{$field->name}`;";
+        $script .= "-- **** IF THE FIELD HAS BEEN DROPPED, uncomment this script: ****".PHP_EOL;
+        $script .= "-- ALTER TABLE `$table` DROP COLUMN `{$field->name}`;".PHP_EOL;
+        $script .= PHP_EOL;
 
         return $script;
     }
@@ -310,7 +341,7 @@ class DbStructureComparator {
 		
 		$SQL = null;
 		if ($field->key == "PRI") {
-			$SQL = "ALTER TABLE `$table` ADD PRIMARY KEY (`{$field->name}`);";	
+			$SQL = "ALTER TABLE `$table` ADD PRIMARY KEY (`{$field->name}`) {$field->extra};";
 		} else if ($field->key == 'MUL') {
 			$SQL = "ALTER TABLE `$table` ADD KEY `{$field->name}` (`{$field->name}`);";
 		} else if ($field->key == 'UNI') {
@@ -473,11 +504,10 @@ class DbStructureComparator {
             if (!empty($row['SQL Original Statement'])) {
                 $script .= "-- ALTER TRIGGER: $name".PHP_EOL;
 
-                // replace the trigger owner
+                $script .= "DROP TRIGGER IF EXISTS $name;".PHP_EOL;
                 $script .= 'delimiter //'.PHP_EOL;
+                // replace the trigger owner
                 $sql = str_replace($src_username, $target_username, $row['SQL Original Statement']);
-                // Replace the CREATE command by an ALTER command
-                $sql = str_replace('CREATE', 'ALTER', $sql);
                 $script .= $sql.';//'.PHP_EOL;
                 $script .= 'delimiter ;'.PHP_EOL.PHP_EOL;
             } else {
@@ -495,7 +525,107 @@ class DbStructureComparator {
     {
         $script = "-- OBSOLETE TRIGGER: $name".PHP_EOL;
         $script .= "-- CHECK IF THE TRIGGER AS BEEN RENAMED. If not, uncomment the following script to drop it".PHP_EOL;
-        $script .= "-- DROP TRIGGER $name".PHP_EOL;
+        $script .= "-- DROP TRIGGER IF EXISTS $name".PHP_EOL;
+
+        return $script;
+    }
+
+    /**
+     * @param \mysqli $db
+     * @param DbForeignKey $key
+     * @param string $src_username
+     * @param string $target_username
+     *
+     * @return string
+     */
+    private function getCreateForeignKeyScript($db, $key, $src_username, $target_username)
+    {
+        $table = $key->getParentTable();
+        $name = $key->getName();
+
+        $script = "";
+
+        $result = $db->query("SHOW CREATE TABLE $table");
+        if ($result) {
+            $row = $result->fetch_assoc();
+            if (!empty($row['Create Table'])) {
+                $lines = explode("\n", $row['Create Table']);
+                $found = false;
+                foreach ($lines as $line) {
+                    if (strpos($line, "CONSTRAINT `$name` FOREIGN KEY")) {
+                        $line = trim($line, ' ,');
+                        $script .= "-- NEW FOREIGN KEY: $name".PHP_EOL;
+                        $script .= "ALTER TABLE $table ADD $line;".PHP_EOL.PHP_EOL;
+                        $found = true;
+                        break;
+                    }
+                }
+                if (!$found) {
+                    echo "ERROR: CONSTRAINT line not found for '$name'".PHP_EOL;
+                }
+            } else {
+                echo "ERROR: CREATE TABLE script not found for '$table'".PHP_EOL;
+            }
+            $result->free();
+        } else {
+            echo "ERROR: Failed to add CREATE FOREIGN KEY script for '$table'".PHP_EOL;
+        }
+
+        return $script;
+    }
+
+    /**
+     * @param \mysqli $db
+     * @param DbForeignKey $key
+     * @param string $src_username
+     * @param string $target_username
+     *
+     * @return string
+     */
+    private function getAlterForeignKeyScript($db, $key, $src_username, $target_username)
+    {
+        $table = $key->getParentTable();
+        $name = $key->getName();
+
+        $script = "";
+
+        $result = $db->query("SHOW CREATE TABLE $table");
+        if ($result) {
+            $row = $result->fetch_assoc();
+            if (!empty($row['Create Table'])) {
+                $lines = explode("\n", $row['Create Table']);
+                $found = false;
+                foreach ($lines as $line) {
+                    if (strpos($line, "CONSTRAINT `$name` FOREIGN KEY")) {
+                        $line = trim($line, ' ,');
+                        $script .= "-- MODIFIED FOREIGN KEY: $name".PHP_EOL;
+                        $script .= "ALTER TABLE $table DROP $name;".PHP_EOL.PHP_EOL;
+                        $script .= "ALTER TABLE $table ADD $line;".PHP_EOL.PHP_EOL;
+                        $found = true;
+                        break;
+                    }
+                }
+                if (!$found) {
+                    echo "ERROR: CONSTRAINT line not found for '$name'".PHP_EOL;
+                }
+            } else {
+                echo "ERROR: CREATE TABLE script not found for '$table'".PHP_EOL;
+            }
+            $result->free();
+        } else {
+            echo "ERROR: Failed to add CREATE FOREIGN KEY script for '$table'".PHP_EOL;
+        }
+
+        return $script;
+    }
+
+    private function getDropForeignKeyScript(DbForeignKey $key)
+    {
+        $table = $key->getParentTable();
+        $name = $key->getName();
+        $script = "-- OBSOLETE FOREIGN KEY: $name".PHP_EOL;
+        $script .= "-- CHECK IF THE FOREIGN KEY AS BEEN RENAMED. If not, uncomment the following script to drop it".PHP_EOL;
+        $script .= "-- ALTER TABLE $table DROP FOREIGN KEY $name;".PHP_EOL;
 
         return $script;
     }

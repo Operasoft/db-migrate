@@ -9,6 +9,7 @@ class DbStructure {
 	public $tables;
 	public $views;
     public $triggers;
+    public $foreignKeys;
 
 	public function __construct($db, $name, $username) {
 		$this->db = $db;
@@ -17,6 +18,7 @@ class DbStructure {
 		$this->tables = $this->loadTableStructure($db, $name);
 		$this->views = $this->loadViewStructure($db, $name);
         $this->triggers = $this->loadTriggers($db);
+        $this->foreignKeys = $this->loadForeignKeys($db);
 	}
 	
 	/**
@@ -136,5 +138,22 @@ class DbStructure {
         }
 
         return $triggers;
+    }
+
+    public function loadForeignKeys($db) {
+	    $foreignKeys = array();
+
+	    $name = $this->name;
+
+	    $result = $db->query("SELECT * FROM information_schema.`KEY_COLUMN_USAGE` WHERE TABLE_SCHEMA = '$name' AND REFERENCED_TABLE_NAME IS NOT NULL");
+        if ($result) {
+            while ($row = $result->fetch_assoc()) {
+                $key = new DbForeignKey($row['CONSTRAINT_NAME'], $row['TABLE_NAME'], $row['COLUMN_NAME'], $row['REFERENCED_TABLE_NAME'], $row['REFERENCED_COLUMN_NAME']);
+                $foreignKeys[$key->getId()] = $key;
+            }
+            $result->free();
+        }
+
+        return $foreignKeys;
     }
 }
