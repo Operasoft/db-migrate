@@ -20,7 +20,55 @@ class DbStructure {
         $this->triggers = $this->loadTriggers($db);
         $this->foreignKeys = $this->loadForeignKeys($db);
 	}
-	
+
+	public function listTables() {
+	    $remainingTables = array();
+	    foreach ($this->tables as $table) {
+	        $remainingTables[$table->getName()] = $table;
+        }
+
+	    $orderedTables = array();
+
+	    while (!empty($remainingTables)) {
+	        $count = count($orderedTables);
+            foreach ($this->tables as $table) {
+                if (isset($orderedTables[$table->getName()])) {
+                    // Already added
+                    continue;
+                }
+                $parents = $table->getParents();
+                if (empty($parents)) {
+                    // New root table
+                    $orderedTables[$table->getName()] = $table;
+                    unset ($remainingTables[$table->getName()]);
+                    continue;
+                }
+                $add = true;
+                foreach ($parents as $parent) {
+                    if (!isset($orderedTables[$parent])) {
+                        // At least 1 parent has not been added yet...
+                        $add = false;
+                        break;
+                    }
+                }
+                if ($add) {
+                    // New root table
+                    $orderedTables[$table->getName()] = $table;
+                    unset ($remainingTables[$table->getName()]);
+                }
+            }
+            if ($count == count($orderedTables)) {
+                // No table added, circular references
+                break;
+            }
+        }
+        foreach ($remainingTables as $table) {
+            $orderedTables[$table->getName()] = $table;
+        }
+
+	    return $orderedTables;
+    }
+
 	/**
 	 * Loads the table structure associated with a given database
 	 * @args $db The mysqli connection to use 
@@ -150,6 +198,9 @@ class DbStructure {
             while ($row = $result->fetch_assoc()) {
                 $key = new DbForeignKey($row['CONSTRAINT_NAME'], $row['TABLE_NAME'], $row['COLUMN_NAME'], $row['REFERENCED_TABLE_NAME'], $row['REFERENCED_COLUMN_NAME']);
                 $foreignKeys[$key->getId()] = $key;
+                if (isset($this->tables[$key->getChildTable()])) {
+                    $this->tables[$key->getChildTable()]->addParent($key->getParentTable());
+                }
             }
             $result->free();
         }

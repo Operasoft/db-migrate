@@ -28,9 +28,9 @@ class DbForeignKey
      * @param string $childTable
      * @param string $childField
      */
-    public function __construct($name, $parentTable, $parentField, $childTable, $childField)
+    public function __construct($name, $childTable, $childField, $parentTable, $parentField)
     {
-        $this->id = $parentTable.'.'.$name;
+        $this->id = $childTable.'.'.$name;
         $this->name = $name;
         $this->parentTable = $parentTable;
         $this->parentField = $parentField;

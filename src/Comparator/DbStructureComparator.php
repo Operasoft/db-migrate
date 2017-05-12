@@ -2,11 +2,20 @@
 namespace DbMigrate\Comparator;
 
 use DbMigrate\Model\DbForeignKey;
+use DbMigrate\Model\DbStructure;
 
 class DbStructureComparator {
+    /** @var  DbStructure */
 	private $srcDb;
+
+    /** @var  DbStructure */
 	private $targetDb;
-	
+
+    /**
+     * DbStructureComparator constructor.
+     * @param DbStructure $srcDb
+     * @param DbStructure $targetDb
+     */
 	public function __construct($srcDb, $targetDb) {
 		$this->srcDb = $srcDb;
 		$this->targetDb = $targetDb;
@@ -21,20 +30,20 @@ class DbStructureComparator {
 		
 		// 1. Compare the list of tables
 		$error = false;
-		$names = array();
+		$existingTables = array();
 		echo "Comparing table list...";
-		foreach ($this->srcDb->tables as $name => $table) {
+		foreach ($this->srcDb->listTables() as $name => $table) {
 			if (!isset($this->targetDb->tables[$name])) {
 				echo "\n\tTable $name not found in ". $this->targetDb->name;
 				$error = true;
 				$scripts[] = $this->getCreateTableScript($this->srcDb->db, $name);
 			} else {
-				$names[] = $name;
+				$existingTables[] = $name;
 			}
 		}
 
 		// Check for tables that are only on the target DB
-        foreach ($this->targetDb->tables as $name => $table) {
+        foreach ($this->targetDb->listTables() as $name => $table) {
             if (!isset($this->srcDb->tables[$name])) {
                 echo "\n\tTable $name not found in ". $this->srcDb->name;
                 $error = true;
@@ -50,7 +59,7 @@ class DbStructureComparator {
 		
 		// Comparing table structure
 		echo "Comparing table structure... ";
-		foreach ($names as $name) {
+		foreach ($existingTables as $name) {
 			$table1 = $this->srcDb->tables[$name];
 			$table2 = $this->targetDb->tables[$name];
 			$msgs = $this->compareTables($table1, $table2, $this->srcDb->name, $this->targetDb->name, $scripts);
@@ -64,7 +73,7 @@ class DbStructureComparator {
 
 		// 2. Compare the list of views
 		$error = false;
-		$names = array();
+		$existingViews = array();
 		echo "Comparing view list...";
 		foreach ($this->srcDb->views as $name => $view) {
 			if (!isset($this->targetDb->views[$name])) {
@@ -72,7 +81,7 @@ class DbStructureComparator {
 				$error = true;
 				$scripts[] = $this->getCreateViewScript($db1, $name, $this->srcDb->username, $this->targetDb->username);
 			} else {
-				$names[] = $name;
+                $existingViews[] = $name;
 			}
 		}
 		if ($error == false) {
@@ -83,7 +92,7 @@ class DbStructureComparator {
 		
 		// Comparing view structure
 		echo "Comparing view structure... ";
-		foreach ($names as $name) {
+		foreach ($existingViews as $name) {
 			$view1 = $this->srcDb->views[$name];
 			$view2 = $this->targetDb->views[$name];
 			$msgs = $this->compareViews($db1, $view1, $view2, $this->srcDb->name, $this->targetDb->name, $this->srcDb->username, $this->targetDb->username, $scripts);
@@ -123,9 +132,11 @@ class DbStructureComparator {
         echo "Comparing foreign keys... ";
         foreach ($this->srcDb->foreignKeys as $name => $key) {
             if (!isset($this->targetDb->foreignKeys[$name])) {
-                echo PHP_EOL."\tForeign key $name not found in ". $this->targetDb->name;
-                $error = true;
-                $scripts[] = $this->getCreateForeignKeyScript($this->srcDb->db, $key, $this->srcDb->username, $this->targetDb->username);
+                if (isset($existingTables[$key->getChildTable()])) {
+                    echo PHP_EOL."\tForeign key $name not found in ". $this->targetDb->name;
+                    $error = true;
+                    $scripts[] = $this->getCreateForeignKeyScript($this->srcDb->db, $key, $this->srcDb->username, $this->targetDb->username);
+                }
             } else if (!$key->equals($this->targetDb->foreignKeys[$name])) {
                 echo PHP_EOL."\tForeign key $name has changed";
                 $scripts[] = $this->getAlterForeignKeyScript($this->srcDb->db, $key, $this->srcDb->username, $this->targetDb->username);
@@ -540,7 +551,7 @@ class DbStructureComparator {
      */
     private function getCreateForeignKeyScript($db, $key, $src_username, $target_username)
     {
-        $table = $key->getParentTable();
+        $table = $key->getChildTable();
         $name = $key->getName();
 
         $script = "";
@@ -584,7 +595,7 @@ class DbStructureComparator {
      */
     private function getAlterForeignKeyScript($db, $key, $src_username, $target_username)
     {
-        $table = $key->getParentTable();
+        $table = $key->getChildTable();
         $name = $key->getName();
 
         $script = "";
@@ -621,7 +632,7 @@ class DbStructureComparator {
 
     private function getDropForeignKeyScript(DbForeignKey $key)
     {
-        $table = $key->getParentTable();
+        $table = $key->getChildTable();
         $name = $key->getName();
         $script = "-- OBSOLETE FOREIGN KEY: $name".PHP_EOL;
         $script .= "-- CHECK IF THE FOREIGN KEY AS BEEN RENAMED. If not, uncomment the following script to drop it".PHP_EOL;

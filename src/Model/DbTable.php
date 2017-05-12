@@ -10,12 +10,15 @@ class DbTable {
     public $rows;
     /** @var array  */
     private $data;
+    /** @var string[] */
+    private $parents;
 
 	function __construct($name) {
 		$this->name = $name;
 		$this->rows = -1;
 		$this->fields = array();
         $this->data = array();
+        $this->parents = array();
 	}
 	
 	public function isEmpty() {
@@ -80,5 +83,29 @@ class DbTable {
     public function setData($data)
     {
         $this->data = $data;
+    }
+
+    /**
+     * @return string[]
+     */
+    public function getParents()
+    {
+        return $this->parents;
+    }
+
+    /**
+     * @param string[] $parent
+     */
+    public function setParents(array $parents)
+    {
+        $this->parents = $parents;
+    }
+
+    /**
+     * @param string $parent
+     */
+    public function addParent($parent)
+    {
+        $this->parents[] = $parent;
     }
 }

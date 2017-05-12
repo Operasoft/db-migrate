@@ -1,5 +1,6 @@
 <?php
 namespace DbMigrate\Comparator;
+use DbMigrate\Model\DbField;
 
 /**
  * This class is used to compare the content of a table between two databases and generates the 
@@ -57,6 +58,16 @@ class DbContentComparator {
 		
 		return false;
 	}
+
+	private function isNullable($table, $field) {
+	    /** @var DbField $dbField */
+        $dbField = $this->dbStructure->tables[$table]->fields[$field];
+        if ($dbField->isNullable()) {
+            return true;
+        }
+
+        return false;
+    }
 	
 	private function addInsertScript($table, $entry) {
 		$first = true;
@@ -100,14 +111,14 @@ class DbContentComparator {
 			} else {
 				$firstValue	= false;						
 			}
-			if ($this->isQuoteRequired($table, $name)) {
+            if (empty($value)) {
+			    if ($this->isNullable($table, $name)) {
+                    $script .= "NULL";
+                }
+            } else if ($this->isQuoteRequired($table, $name)) {
 				$script .= "'".str_replace("'", "''", $value)."'";
 			} else {
-				if (empty($value)) {
-					$script .= "NULL";
-				} else {
-					$script .= "$value";					
-				}
+				$script .= "$value";
 			}
 		}				
 		$script .= ")";
