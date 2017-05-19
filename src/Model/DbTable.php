@@ -12,6 +12,8 @@ class DbTable {
     private $data;
     /** @var string[] */
     private $parents;
+    /** @var DbKey[] */
+    private $keys;
 
 	function __construct($name) {
 		$this->name = $name;
@@ -19,6 +21,7 @@ class DbTable {
 		$this->fields = array();
         $this->data = array();
         $this->parents = array();
+        $this->keys = array();
 	}
 	
 	public function isEmpty() {
@@ -107,5 +110,36 @@ class DbTable {
     public function addParent($parent)
     {
         $this->parents[] = $parent;
+    }
+
+    /**
+     * @return DbKey[]
+     */
+    public function getKeys()
+    {
+        return $this->keys;
+    }
+
+    /**
+     * @param DbKey[] $keys
+     */
+    public function setKeys($keys)
+    {
+        $this->keys = $keys;
+    }
+
+    public function addKey(DbKey $key)
+    {
+        $this->keys[$key->getName()] = $key;
+    }
+
+    public function containKey($name)
+    {
+        return isset($this->keys[$name]);
+    }
+
+    public function getKey($name)
+    {
+        return $this->keys[$name];
     }
 }

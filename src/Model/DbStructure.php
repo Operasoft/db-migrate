@@ -88,7 +88,11 @@ class DbStructure {
 		}
 		
 		// Gather information about each table
-		foreach ($structure as $name => $table) {
+        /**
+         * @var string $name
+         * @var DbTable $table
+         */
+        foreach ($structure as $name => $table) {
 			// Extract the number of rows it contains
 			$result = $db->query("SELECT COUNT(*) AS count FROM $name");
 			if ($result) {
@@ -116,6 +120,31 @@ class DbStructure {
 				}
 				$result->free();
 			}
+
+			// Extract each key
+            $result = $db->query("SHOW CREATE TABLE $name");
+            if ($result) {
+                $row = $result->fetch_assoc();
+                $lines = explode("\n", $row['Create Table']);
+                foreach ($lines as $line) {
+                    $line = trim($line, " \t\n\r\0\x0B,");
+                    if (substr( $line, 0, 3 ) === "KEY") {
+                        $elements = explode(' ', $line);
+                        $dbKey = new DbKey($elements[1], $line);
+                        $table->addKey($dbKey);
+                    } else if (substr( $line, 0, 10 ) === "UNIQUE KEY") {
+                        $elements = explode(' ', $line);
+                        $dbKey = new DbKey($elements[2], $line);
+                        $table->addKey($dbKey);
+                    } else if (substr( $line, 0, 11 ) === "PRIMARY KEY") {
+                        $elements = explode(' ', $line);
+                        $dbKey = new DbKey($elements[2], $line);
+                        $table->addKey($dbKey);
+                    }
+                }
+                $result->free();
+            }
+
 		}
 		
 		return $structure;		

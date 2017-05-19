@@ -2,7 +2,9 @@
 namespace DbMigrate\Comparator;
 
 use DbMigrate\Model\DbForeignKey;
+use DbMigrate\Model\DbKey;
 use DbMigrate\Model\DbStructure;
+use DbMigrate\Model\DbTable;
 
 class DbStructureComparator {
     /** @var  DbStructure */
@@ -200,6 +202,15 @@ class DbStructureComparator {
         return $script;
     }
 
+    /**
+     * @param DbTable $table1
+     * @param DbTable $table2
+     * @param $db1_name
+     * @param $db2_name
+     * @param $scripts
+     *
+     * @return array
+     */
 	private function compareTables($table1, $table2, $db1_name, $db2_name, &$scripts) {
 		$msg = array();
 		$prevField = null;
@@ -220,17 +231,23 @@ class DbStructureComparator {
 					$msg[] = $reason;
 					$scripts[] = $this->getAlterFieldScript($table1->name, $field, $reason, $field->key != $field2->key);
 				}
+				/*
 				if ($field->key != $field2->key) {
 					$msg[] = "ERROR: Field $name has a different key value: $db1_name.". $field->key . " : $db2_name.". $field2->key;
 					if ($field->key) {
 						$scripts[] = $this->addKeyScript($table1->name, $field);
 					}
 				}
+				*/
 				if ($field->default != $field2->default) {
-					$msg[] = "WARNING: Field $name has a different default value: $db1_name.". $field->default . " : $db2_name.". $field2->default;
+					$reason = "WARNING: Field $name has a different default value: $db1_name.". $field->default . " : $db2_name.". $field2->default;
+                    $msg[] = $reason;
+                    $scripts[] = $this->getAlterFieldScript($table1->name, $field, $reason, $field->key != $field2->key);
 				}
 				if ($field->extra != $field2->extra) {
-					$msg[] = "WARNING: Field $name has a different extra value: $db1_name.". $field->extra . " : $db2_name.". $field2->extra;
+                    $reason = "WARNING: Field $name has a different extra value: $db1_name.". $field->extra . " : $db2_name.". $field2->extra;
+                    $msg[] = $reason;
+                    $scripts[] = $this->getAlterFieldScript($table1->name, $field, $reason, $field->key != $field2->key);
 				}
 			}
 			
@@ -243,7 +260,26 @@ class DbStructureComparator {
                 $scripts[] = $this->getDropFieldScript($table1->name, $field);
 			}
 		}	
-		
+
+		foreach ($table1->getKeys() as $key1) {
+            if (!$table2->containKey($key1->getName())) {
+                $msg[] = "Key {$key1->getName()} not found in ". $db1_name;
+                $scripts[] = $this->getAddDbKeyScript($table1->name, $key1);
+            } else {
+                $key2 = $table2->getKey($key1->getName());
+                if ($key1->getDefinition() !== $key2->getDefinition()) {
+                    $msg[] = "Key {$key1->getName()} has been modified in ". $db1_name. ". Previous version: ".$key2->getDefinition();
+                    $scripts[] = $this->getAlterDbKeyScript($table1->name, $key1, $key2);
+                }
+            }
+        }
+
+        foreach ($table2->getKeys() as $key2) {
+            if (!$table1->containKey($key2->getName())) {
+                $msg[] = "Key {$key2->getName()} has been removed in ". $db1_name;
+                $scripts[] = $this->getDropDbKeyScript($table2->name, $key2);
+            }
+        }
 		return $msg;
 	}
 	
@@ -267,6 +303,9 @@ class DbStructureComparator {
 		} else if ($field->nullable) {
 			$options .= " DEFAULT NULL";
 		}
+		if ($field->extra != null) {
+            $options .= " ".$field->extra;
+        }
 		
 		$key = "";
 		if ($field->key == "PRI") {
@@ -310,6 +349,9 @@ class DbStructureComparator {
 		} else if ($field->nullable) {
 			$options .= " DEFAULT NULL";
 		}
+        if ($field->extra != null) {
+            $options .= " ".$field->extra;
+        }
 
         $key = "";
 		if ($differentKey) {
@@ -346,6 +388,7 @@ class DbStructureComparator {
 
 	/**
 	 * Creates the SQL script to add a new key to an existing table
+     * @deprecated
 	 */
 	private function addKeyScript($table, $field) {
 		$script = "";
@@ -368,7 +411,52 @@ class DbStructureComparator {
 		
 		return $script;
 	}
-	
+
+    /**
+     * @param string $table
+     * @param DbKey $key
+     *
+     * @return string
+     */
+    private function getAddDbKeyScript($table, $key) {
+        $script = "";
+
+        $script .= "-- ADD KEY {$key->getName()} to table $table".PHP_EOL;
+        $script .= "ALTER TABLE `$table` ADD ". $key->getDefinition().';'.PHP_EOL;
+        return $script;
+    }
+
+    /**
+     * @param string $table
+     * @param DbKey $key
+     * @param DbKey $oldKey
+     *
+     * @return string
+     */
+    private function getAlterDbKeyScript($table, $key, $oldKey) {
+        $script = "";
+
+        $script .= "-- MODIFIED KEY {$key->getName()} in table $table. Previous definition: {$oldKey->getDefinition()}".PHP_EOL;
+        $script .= "ALTER TABLE `$table` DROP KEY ". $key->getName().';'.PHP_EOL;
+        $script .= "ALTER TABLE `$table` ADD ". $key->getDefinition().';'.PHP_EOL;
+        return $script;
+    }
+
+    /**
+     * @param string $table
+     * @param DbKey $key
+     *
+     * @return string
+     */
+    private function getDropDbKeyScript($table, $key) {
+        $script = "";
+
+        $script .= "-- OBSOLETE KEY {$key->getName()} in table $table. Previous definition: {$key->getDefinition()}".PHP_EOL;
+        $script .= "-- Uncomment the following line to execute it".PHP_EOL;
+        $script .= "-- ALTER TABLE `$table` DROP KEY ". $key->getName().';'.PHP_EOL;
+        return $script;
+    }
+
 	/**
 	 * Creates the SQL script to create a new view
 	 */
