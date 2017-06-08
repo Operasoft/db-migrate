@@ -108,7 +108,14 @@ class DbConnection
      */
     public function connect($database) {
         $mysqli = mysqli_init();
-        $mysqli->real_connect($this->host, $this->username, $this->password, $database);
+        $index = strpos($this->host, ':');
+        if ($index === FALSE) {
+            $mysqli->real_connect($this->host, $this->username, $this->password, $database);
+        } else {
+            $host = substr($this->host, 0, $index);
+            $port = substr($this->host, $index+1);
+            $mysqli->real_connect($host, $this->username, $this->password, $database, $port);
+        }
         if ($mysqli->connect_errno) {
             throw new \Exception("Failed to connect to $database on {$this->host}: (" . $mysqli->connect_errno . ") " . $mysqli->connect_error);
         }
