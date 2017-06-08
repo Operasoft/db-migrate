@@ -40,7 +40,7 @@ class DbStructureComparator {
 				$error = true;
 				$scripts[] = $this->getCreateTableScript($this->srcDb->db, $name);
 			} else {
-				$existingTables[] = $name;
+				$existingTables[$name] = $name;
 			}
 		}
 
@@ -220,35 +220,32 @@ class DbStructureComparator {
 				$msg[] = "Field $name not found in ". $db2_name;
 				$scripts[] = $this->getAddFieldScript($table1->name, $field, $prevField);
 			} else {
+			    $reasons = array();
 				$field2 = $table2->fields[$name];
 				if ($field->type != $field2->type) {
 					$reason = "ERROR: Field $name has a different type: $db1_name.". $field->type . " : $db2_name.". $field2->type;
 					$msg[] = $reason;
-					$scripts[] = $this->getAlterFieldScript($table1->name, $field, $reason, $field->key != $field2->key);
+					$reasons[] = $reason;
 				}
 				if ($field->nullable != $field2->nullable) {
 					$reason = "WARNING: Field $name has a different nullable value: $db1_name.". $field->nullable . " : $db2_name.". $field2->nullable;
 					$msg[] = $reason;
-					$scripts[] = $this->getAlterFieldScript($table1->name, $field, $reason, $field->key != $field2->key);
+                    $reasons[] = $reason;
 				}
-				/*
-				if ($field->key != $field2->key) {
-					$msg[] = "ERROR: Field $name has a different key value: $db1_name.". $field->key . " : $db2_name.". $field2->key;
-					if ($field->key) {
-						$scripts[] = $this->addKeyScript($table1->name, $field);
-					}
-				}
-				*/
 				if ($field->default != $field2->default) {
 					$reason = "WARNING: Field $name has a different default value: $db1_name.". $field->default . " : $db2_name.". $field2->default;
                     $msg[] = $reason;
-                    $scripts[] = $this->getAlterFieldScript($table1->name, $field, $reason, $field->key != $field2->key);
+                    $reasons[] = $reason;
 				}
 				if ($field->extra != $field2->extra) {
                     $reason = "WARNING: Field $name has a different extra value: $db1_name.". $field->extra . " : $db2_name.". $field2->extra;
                     $msg[] = $reason;
-                    $scripts[] = $this->getAlterFieldScript($table1->name, $field, $reason, $field->key != $field2->key);
+                    $reasons[] = $reason;
 				}
+
+				if (!empty($reasons)) {
+                    $scripts[] = $this->getAlterFieldScript($table1->name, $field, $reasons);
+                }
 			}
 			
 			$prevField = $field->name;
@@ -306,8 +303,9 @@ class DbStructureComparator {
 		if ($field->extra != null) {
             $options .= " ".$field->extra;
         }
-		
+
 		$key = "";
+        /* Keys are now handled separately
 		if ($field->key == "PRI") {
 			$key = " PRIMARY KEY {$field->extra}";
 		} else if ($field->key == 'MUL') {
@@ -315,6 +313,7 @@ class DbStructureComparator {
 		} else if ($field->key == 'UNI') {
 			$key = ", ADD UNIQUE (`{$field->name}`)";	
 		}
+        */
 		
 		if (empty($after)) {
 			$SQL = "ALTER TABLE `$table` ADD `{$field->name}` {$field->type} $options $key FIRST;";
@@ -331,7 +330,7 @@ class DbStructureComparator {
 	/**
 	 * Creates the SQL script to modify an existing field in an existing table
 	 */
-	private function getAlterFieldScript ($table, $field, $reason, $differentKey) {
+	private function getAlterFieldScript ($table, $field, $reasons) {
 		$script = "";
 		
 		$options = "";
@@ -353,20 +352,12 @@ class DbStructureComparator {
             $options .= " ".$field->extra;
         }
 
-        $key = "";
-		if ($differentKey) {
-            if ($field->key == "PRI") {
-                $key = ", ADD PRIMARY KEY (`{$field->name}`) {$field->extra}";
-            } else if ($field->key == 'MUL') {
-                $key = ", ADD KEY `{$field->name}` (`{$field->name}`)";
-            } else if ($field->key == 'UNI') {
-                $key = ", ADD UNIQUE (`{$field->name}`)";
-            }
-        }
-
-		$SQL = "ALTER TABLE `$table` CHANGE `{$field->name}` `{$field->name}` {$field->type} $options $key;";
+		$SQL = "ALTER TABLE `$table` CHANGE `{$field->name}` `{$field->name}` {$field->type} $options;";
 		
-		$script .= "-- MODIFY FIELD {$field->name} in table $table".PHP_EOL."-- Reason: $reason".PHP_EOL;
+		$script .= "-- MODIFY FIELD {$field->name} in table $table".PHP_EOL."-- Reasons:".PHP_EOL;
+		foreach ($reasons as $reason) {
+            $script .= "--     $reason".PHP_EOL;
+        }
 		$script .= $SQL.PHP_EOL;
 		
 		return $script;
@@ -453,7 +444,11 @@ class DbStructureComparator {
 
         $script .= "-- OBSOLETE KEY {$key->getName()} in table $table. Previous definition: {$key->getDefinition()}".PHP_EOL;
         $script .= "-- Uncomment the following line to execute it".PHP_EOL;
-        $script .= "-- ALTER TABLE `$table` DROP KEY ". $key->getName().';'.PHP_EOL;
+        if ($key->isPrimary()) {
+            $script .= "-- ALTER TABLE `$table` DROP PRIMARY KEY;".PHP_EOL;
+        } else {
+            $script .= "-- ALTER TABLE `$table` DROP KEY ". $key->getName().';'.PHP_EOL;
+        }
         return $script;
     }
 
@@ -698,7 +693,7 @@ class DbStructureComparator {
                     if (strpos($line, "CONSTRAINT `$name` FOREIGN KEY")) {
                         $line = trim($line, ' ,');
                         $script .= "-- MODIFIED FOREIGN KEY: $name".PHP_EOL;
-                        $script .= "ALTER TABLE $table DROP $name;".PHP_EOL.PHP_EOL;
+                        $script .= "ALTER TABLE $table DROP FOREIGN KEY $name;".PHP_EOL.PHP_EOL;
                         $script .= "ALTER TABLE $table ADD $line;".PHP_EOL.PHP_EOL;
                         $found = true;
                         break;

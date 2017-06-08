@@ -114,6 +114,10 @@ class DbContentComparator {
             if (empty($value)) {
 			    if ($this->isNullable($table, $name)) {
                     $script .= "NULL";
+                } else if ($this->isQuoteRequired($table, $name)) {
+                    $script .= "''";
+                } else {
+                    $script .= '0';
                 }
             } else if ($this->isQuoteRequired($table, $name)) {
 				$script .= "'".str_replace("'", "''", $value)."'";
@@ -193,17 +197,18 @@ class DbContentComparator {
 			$proceed = false;
 			if (!isset($targetEntries[$key])) {
 				// This is a new entry, we need to migrate it
+                echo "$key not present in target DB".PHP_EOL;
 				$proceed = true;
 			} else if (isset($entry['modified'])) {
                 if (strtotime($entry['modified']) > strtotime($targetEntries[$key]['modified'])) {
                     // The entry on the source DB is more recent than the one on the target DB
-                    echo "$key - Source date: ".$entry['modified']. " target date: ".$targetEntries[$key]['modified'];
+                    echo "$key - Source date: ".$entry['modified']. " target date: ".$targetEntries[$key]['modified'].PHP_EOL;
                     $proceed = true;
                 }
             } else if (isset($entry['updated'])) {
                 if (strtotime($entry['updated']) > strtotime($targetEntries[$key]['updated'])) {
                     // The entry on the source DB is more recent than the one on the target DB
-                    echo "$key - Source date: ".$entry['updated']. " target date: ".$targetEntries[$key]['updated'];
+                    echo "$key - Source date: ".$entry['updated']. " target date: ".$targetEntries[$key]['updated'].PHP_EOL;
                     $proceed = true;
                 }
             }

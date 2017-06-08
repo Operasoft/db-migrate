@@ -56,4 +56,9 @@ class DbKey
     {
         $this->definition = $definition;
     }
+
+    public function isPrimary()
+    {
+        return (strpos($this->definition, "PRIMARY KEY") !== FALSE);
+    }
 }
